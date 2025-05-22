@@ -10,16 +10,14 @@ local function readDict(file, readFunc, args)
     file:seek("cur", 2 + 8 + (4 * size) + 4) -- skip things we don't need
 
     for i = 1, size, 1 do
-        log:write("Read Dict Entry Data ", i, "\n")
         values[i] = readFunc(file, args)
     end
-    log:write("Size of read Dict is ", #items, "\n")
 
     for i = 1, size, 1 do
         local name = string.unpack("<c16", file:read(16)):gsub("%z+$", ""):gsub("%z+", "")
+        log:write("Name is ", name, "\n")
         items[i] = { name, values[i] }
     end
-    log:write("Size of final Dict is ", #items, "\n")
 
     return items
 end
@@ -98,7 +96,8 @@ local function readTexture(file, args)
             end
         end
     end
-
+    file:seek("set", readPos)
+    file:seek("cur", 4)
     return texture
 end
 
