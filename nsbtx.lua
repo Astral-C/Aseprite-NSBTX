@@ -113,6 +113,11 @@ local function import(plugin)
         focus = true,
     }
 
+    dlg:check {
+        id = "textureascel",
+        label = "Texture as Cel"
+    }
+
     dlg:button {
         text = "Import",
         onclick = function()
@@ -166,10 +171,24 @@ local function import(plugin)
                     local nxbtx_images = readDict(file, readTexture, { sectionOffset + textureDataOff, textureDataSize })
 
                     local sprite = Sprite(nxbtx_images[1][2]["width"], nxbtx_images[1][2]["height"], ColorMode.INDEXED)
+
+                    if not dlg.data.textureascel then
+                        sprite:deleteLayer(sprite.layers[1])
+                    end
+
+                    local frame = 1
                     for name, value in ipairs(nxbtx_images) do
-                        local layer = sprite:newLayer()
-                        layer.name = value[1]
-                        sprite:newCel(layer, 1, value[2]["data"])
+                        if dlg.data.textureascel then
+                            if #sprite.frames - 1 >= frame then
+                                sprite:newEmptyFrame(frame)
+                            end
+                            sprite:newCel(sprite.layers[1], frame, value[2]["data"])
+                            frame = frame + 1
+                        else
+                            local layer = sprite:newLayer()
+                            layer.name = value[1]
+                            sprite:newCel(layer, 1, value[2]["data"])
+                        end
                     end
 
                     for name, value in ipairs(palettes) do
