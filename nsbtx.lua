@@ -1,3 +1,7 @@
+local function color5To8(value)
+    return (value << 3) | (value >> 2)
+end
+
 local function readDict(file, readFunc, args)
     file:seek("cur", 1)
     local size = string.unpack("<b", file:read(1))
@@ -17,10 +21,6 @@ local function readDict(file, readFunc, args)
     end
 
     return items
-end
-
-local function color5To8(value)
-    return (value << 3) | (value >> 2)
 end
 
 local function readPalette(file, args)
