@@ -7,14 +7,21 @@ local function readDict(file, readFunc, args)
 
     file:seek("cur", 2 + 8 + (4 * size) + 4) -- skip things we don't need
 
-    for i = 1, size - 1, 1 do
-        values[i] = readFunc(file, args)
+    if size == 1 then
+        value = readFunc(file, args)
+        local name = string.unpack("<c16", file:read(16)):gsub("%z+$", ""):gsub("%z+", "")
+        items[1] = { name, value }
+    else
+        for i = 1, size - 1, 1 do
+            values[i] = readFunc(file, args)
+        end
+
+        for i = 1, size - 1, 1 do
+            local name = string.unpack("<c16", file:read(16)):gsub("%z+$", ""):gsub("%z+", "")
+            items[i] = { name, values[i] }
+        end
     end
 
-    for i = 1, size - 1, 1 do
-        local name = string.unpack("<c16", file:read(16)):gsub("%z+$", ""):gsub("%z+", "")
-        items[i] = { name, values[i] }
-    end
 
     return items
 end
