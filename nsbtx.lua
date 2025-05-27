@@ -1,7 +1,3 @@
-local function color5To8(value)
-    return (value << 3) | (value >> 2)
-end
-
 local function readDict(file, readFunc, args)
     file:seek("cur", 1)
     local size = string.unpack("<b", file:read(1))
@@ -11,11 +7,11 @@ local function readDict(file, readFunc, args)
 
     file:seek("cur", 2 + 8 + (4 * size) + 4) -- skip things we don't need
 
-    for i = 1, size, 1 do
+    for i = 1, size - 1, 1 do
         values[i] = readFunc(file, args)
     end
 
-    for i = 1, size, 1 do
+    for i = 1, size - 1, 1 do
         local name = string.unpack("<c16", file:read(16)):gsub("%z+$", ""):gsub("%z+", "")
         items[i] = { name, values[i] }
     end
@@ -23,13 +19,28 @@ local function readDict(file, readFunc, args)
     return items
 end
 
+local function color5To8(value)
+    return (value << 3) | (value >> 2)
+end
+
 local function readPalette(file, args)
     local palette = Palette()
 
     local paletteOffset = (string.unpack("<H", file:read(2)) << 3) + args[1]
+    file:seek("cur", 2)
     local listPos = file:seek("cur")
 
-    local colorCount = args[2] / 2
+    local nextPaletteOffset = (string.unpack("<H", file:read(2)) << 3) + args[1]
+
+    while nextPaletteOffset == paletteOffset do
+        nextPaletteOffset = (string.unpack("<H", file:read(2)) << 3) + args[1]
+    end
+
+    if nextPaletteOffset > args[1] + args[2] or nextPaletteOffset < paletteOffset then
+        nextPaletteOffset = args[1] + args[2]
+    end
+
+    local colorCount = (nextPaletteOffset - paletteOffset) / 2
 
     file:seek("set", paletteOffset)
     palette:resize(colorCount)
@@ -96,6 +107,7 @@ end
 local function import(plugin)
     local dlg = Dialog("Import NSBTX")
 
+
     dlg:file {
         id = "source",
         label = "Source:",
@@ -107,6 +119,11 @@ local function import(plugin)
     dlg:check {
         id = "textureascel",
         label = "Texture as Cel"
+    }
+
+    dlg:check {
+        id = "imageperpalette",
+        label = "New Image for each Palette"
     }
 
     dlg:button {
@@ -155,29 +172,54 @@ local function import(plugin)
                     file:seek("set", sectionOffset + textureListOff)
                     local nxbtx_images = readDict(file, readTexture, { sectionOffset + textureDataOff, textureDataSize })
 
-                    local sprite = Sprite(nxbtx_images[1][2]["width"], nxbtx_images[1][2]["height"], ColorMode.INDEXED)
+                    if dlg.data.imageperpalette then
+                        for name, pal in ipairs(palettes) do
+                            local sprite = Sprite(nxbtx_images[1][2]["width"], nxbtx_images[1][2]["height"],
+                                ColorMode.INDEXED)
+                            sprite:setPalette(pal[2])
 
-                    if not dlg.data.textureascel then
-                        sprite:deleteLayer(sprite.layers[1])
-                    end
-
-                    local frame = 1
-                    for name, value in ipairs(nxbtx_images) do
-                        if dlg.data.textureascel then
-                            if #sprite.frames - 1 <= frame then
-                                sprite:newEmptyFrame()
+                            if not dlg.data.textureascel then
+                                sprite:deleteLayer(sprite.layers[1])
                             end
-                            sprite:newCel(sprite.layers[1], frame, value[2]["data"])
-                            frame = frame + 1
-                        else
-                            local layer = sprite:newLayer()
-                            layer.name = value[1]
-                            sprite:newCel(layer, 1, value[2]["data"])
-                        end
-                    end
 
-                    for name, value in ipairs(palettes) do
-                        sprite:setPalette(value[2])
+                            local frame = 1
+                            for name, value in ipairs(nxbtx_images) do
+                                if dlg.data.textureascel then
+                                    if #sprite.frames - 1 >= frame then
+                                        sprite:newEmptyFrame(frame)
+                                    end
+                                    sprite:newCel(sprite.layers[1], frame, value[2]["data"])
+                                    frame = frame + 1
+                                else
+                                    local layer = sprite:newLayer()
+                                    layer.name = value[1]
+                                    sprite:newCel(layer, 1, value[2]["data"])
+                                end
+                            end
+                        end
+                    else
+                        local sprite = Sprite(nxbtx_images[1][2]["width"], nxbtx_images[1][2]["height"],
+                            ColorMode.INDEXED)
+                        if not dlg.data.textureascel then
+                            sprite:deleteLayer(sprite.layers[1])
+                        end
+
+                        local frame = 1
+                        for name, value in ipairs(nxbtx_images) do
+                            if dlg.data.textureascel then
+                                if #sprite.frames - 1 >= frame then
+                                    sprite:newEmptyFrame(frame)
+                                end
+                                sprite:newCel(sprite.layers[1], frame, value[2]["data"])
+                                frame = frame + 1
+                            else
+                                local layer = sprite:newLayer()
+                                layer.name = value[1]
+                                sprite:newCel(layer, 1, value[2]["data"])
+                            end
+                        end
+
+                        sprite:setPalette(palettes[1][2])
                     end
                 end
 
